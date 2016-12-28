@@ -1,0 +1,13 @@
+# [member]
+ETCD_NAME=default
+ETCD_DATA_DIR="{{ etcd.data_dir }}"
+ETCD_LISTEN_CLIENT_URLS="{{etcd.listen_client_urls}}"
+
+#[cluster]
+ETCD_ADVERTISE_CLIENT_URLS="{{etcd.advertive_client_url}}"
+{% if groups["master"]|length > 1 %}
+ETCD_INITIAL_CLUSTER="{%for host in groups["master"] -%}
+{{ host }}=http://{{hostvars[host]['ansible_'+ network.int_iface]['ipv4']['address']}}:2380,
+{%- endfor %}"
+ETCD_INITIAL_CLUSTER_STATE=new
+{% endif %}

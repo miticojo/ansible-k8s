@@ -1,0 +1,24 @@
+- name: Generate /etc/kubernetes/kubelet
+  template: src=etc/kubernetes/kubelet.j2 dest=/etc/kubernetes/kubelet
+  tags: kubelet
+
+- name: Config flannel network overlay
+  template: src=etc/sysconfig/flanneld.j2 dest=/etc/sysconfig/flanneld
+  tags: flanneld
+
+- name: Start {{item}} service
+  service: name={{item}} state=restarted enabled=yes
+  with_items:
+  - kube-proxy
+  - kubelet
+  - flanneld
+  - docker
+  tags: [ kubelet, flanneld, docker ]
+
+- name: Configure kubectl
+  command: "{{item}}"
+  with_items:
+  - "kubectl config set-cluster default-cluster --server=http://{{groups['master'][0]}}:{{kubernetes.kube_api_port}}"
+  - "kubectl config set-context default-context --cluster=default-cluster --user=default-admin"
+  - "kubectl config use-context default-context"
+  tags: kubelet

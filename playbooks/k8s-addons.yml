@@ -1,0 +1,25 @@
+- name: Copy kubernetes addons template
+  template: src=k8s/{{item}} dest=/root/{{item[:-3]}}
+  with_items:
+    - dashboard.yml.j2
+    - registry-rc.yml.j2
+    - registry-svc.yml.j2
+    - kubedns-rc.yml.j2
+    - kubedns-svc.yml.j2
+  tags: [ dns, dashboard ]
+
+- name: Deploy dns if doesn't exist yet
+  command: kubectl create -f /root/kubedns-rc.yml  -f /root/kubedns-svc.yml
+  register: dns
+  failed_when: >
+    dns.rc != 0 and ("already exists" not in dns.stderr)
+  when: dns.deploy
+  tags: dns
+
+- name: Deploy dashboard if doesn't exist yet
+  command: kubectl create -f /root/dashboard.yml
+  register: dashboard
+  failed_when: >
+    dashboard.rc != 0 and ("already exists" not in dashboard.stderr)
+  when: dashboard
+  tags: dashboard
