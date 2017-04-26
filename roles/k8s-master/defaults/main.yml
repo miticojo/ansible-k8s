@@ -1,0 +1,30 @@
+
+dns_domain: cluster.local
+local_ca_folder: ./certs                       # local folder used to create certificates
+certificates_folder: /etc/kubernetes/ssl       # remote target path for certificats
+ca_folder: /opt/kubernetes_ca                  # remote target path for entire CA folder (only on master 1)
+ca_domain: "{{dns_domain}}"                      # domain used for cluster
+
+ca_crt_expires: 3650                # expiration for root CA certificate
+ca_apiserver_crt_expires: 3650      # expiration for kube api server and kubelet certificates
+ca_etcd_crt_expires: 3650           # expiration for etcd certificates
+
+### etcd conf ###
+etcd_initial_cluster_token: "etc-cluster-{{ansible_date_time.epoch}}"
+etcd_data_dir: "/var/lib/etcd"
+etcd_certs_dir: "{{certificates_folder}}/etcd"
+etcdctl_cmd: "etcdctl -ca-file {{etcd_certs_dir}}/ca.pem --cert-file {{etcd_certs_dir}}/{{inventory_hostname}}.pem  --key-file {{etcd_certs_dir}}/{{inventory_hostname}}-key.pem"
+
+### kube api conf ###
+kube_master_api_lb: no
+kube_certs_dir: "{{certificates_folder}}/kubernetes"
+kube_master_ip: "{{groups['k8s-master'][0]}}"
+kube_master_api_uri: "https://{{kube_master_ip}}:{{kube_api_secure_port}}"
+kube_api_insecure_address: 127.0.0.1
+kube_api_insecure_port: 8080
+kube_api_secure_port: 6443
+kube_service_addresses: 10.254.0.0/16
+kube_api_args: "--etcd-cafile {{etcd_certs_dir}}/ca.pem --etcd-certfile {{etcd_certs_dir}}/{{inventory_hostname}}.pem --etcd-keyfile={{etcd_certs_dir}}/{{inventory_hostname}}-key.pem --kubelet-https=true --client-ca-file={{kube_certs_dir}}/ca.pem --tls-cert-file={{kube_certs_dir}}/apiserver.pem --tls-private-key-file={{kube_certs_dir}}/apiserver-key.pem"
+
+### kubelet conf ###
+kubelet_port: 10250

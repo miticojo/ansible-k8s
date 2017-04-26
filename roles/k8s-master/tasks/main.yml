@@ -1,0 +1,122 @@
+- name: Install kubernetes packages
+  yum: name={{item}}  state=present
+  with_items:
+  - kubernetes
+  - etcd
+
+- name: Generate certificates
+  include_role:
+    name: k8s-certs
+  delegate_to: localhost
+  run_once: yes
+  become: no
+  tags: certs
+
+- name: Copy CA folder to first master SERVER
+  copy:
+    src: "{{local_ca_folder}}/"
+    dest: "{{ca_folder}}"
+  run_once: yes
+  tags: certs
+
+- name: Create folder for certificates
+  file: path={{item}} state=directory mode="u=rwX,g=rX,o=rX"
+  with_items:
+  - "{{kube_certs_dir}}"
+  - "{{etcd_certs_dir}}"
+  tags: certs
+
+- name: Copy CA cert all nodes
+  copy:
+    src: "{{local_ca_folder}}/{{item}}/ca.pem"
+    dest: "{{certificates_folder}}/{{item}}/ca.pem"
+    owner: root
+    group: root
+    mode: 0644
+  with_items:
+  - kubernetes
+  - etcd
+  tags: certs
+
+- name: Copy own etcd certs
+  copy:
+    src: "{{local_ca_folder}}/{{item}}"
+    dest: "{{certificates_folder}}/{{item}}"
+    owner: root
+    group: root
+    mode: 0644
+  with_items:
+  - "etcd/{{inventory_hostname}}.pem"
+  - "etcd/{{inventory_hostname}}-key.pem"
+  tags:
+  - certs
+  - etcd
+
+- name: Generate /etc/etcd/etcd.conf
+  template: src=etc/etcd/etcd.conf.j2 dest=/etc/etcd/etcd.conf backup=yes
+  tags: etcd
+  notify:
+  - restart etcd service
+  - check etcd cluster health
+
+- name: Start Etcd service
+  service: name=etcd state=restarted enabled=yes
+  tags: etcd
+  notify: check etcd cluster health
+
+- name: Copy own kube-apiserver certs
+  copy:
+    src: "{{local_ca_folder}}/{{item}}"
+    dest: "{{certificates_folder}}/{{item}}"
+    owner: root
+    group: root
+    mode: 0644
+  with_items:
+  - "kubernetes/apiserver.pem"
+  - "kubernetes/apiserver-key.pem"
+  tags:
+  - certs
+  - kube-apiserver
+
+- name: Generate /etc/kubernetes/apiserver
+  template: src=etc/kubernetes/apiserver.j2 dest=/etc/kubernetes/apiserver backup=yes
+  tags: kube-apiserver
+  notify:
+  - restart kube-apiserver service
+
+- name: Start and enable kube-apiserver
+  service: name=kube-apiserver state=restarted enabled=yes
+  tags: kube-apiserver
+
+- name: Generate /etc/kubernetes/config
+  template: src={{item.src}} dest={{item.dest}} backup=yes
+  with_items:
+  - src: etc/kubernetes/config.j2
+    dest: /etc/kubernetes/config
+  - src: etc/kubernetes/controller-manager.j2
+    dest: /etc/kubernetes/controller-manager
+  - src: etc/kubernetes/controller-manager.j2
+    dest: /etc/kubernetes/controller-manager
+  - src: etc/kubernetes/scheduler.j2
+    dest: /etc/kubernetes/scheduler
+  - src: etc/kubernetes/proxy.j2
+    dest: /etc/kubernetes/proxy
+  tags:
+  - kube-apiserver
+  - kube-controller-manager
+  - kube-scheduler
+  - kube-proxy
+  notify:
+  - restart kube services
+
+- name: Start {{item}} service
+  service: name={{item}} state=restarted enabled=yes
+  with_items:
+  - kube-controller-manager
+  - kube-scheduler
+  - kube-proxy
+  tags:
+  - kube-apiserver
+  - kube-controller-manager
+  - kube-scheduler
+  - kube-proxy

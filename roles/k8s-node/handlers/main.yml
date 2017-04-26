@@ -1,0 +1,3 @@
+
+- name: restart flanneld service
+  service: name=flanneld state=restarted

@@ -1,0 +1,20 @@
+# {{ ansible_managed }}
+
+# The address for the info server to serve on
+KUBELET_ADDRESS="--address=0.0.0.0"
+
+# The port for the info server to serve on
+KUBELET_PORT="--port={{kubelet_port}}"
+
+# You may leave this blank to use the actual hostname
+# Check the node number!
+KUBELET_HOSTNAME="--hostname-override={{ansible_hostname}}"
+
+# Location of the api-server
+KUBELET_API_SERVER="--api-servers={{kube_master_api_uri}}"
+
+{% if dns_server != '' %}
+KUBELET_ARGS="{{'--cluster-dns={} --cluster-domain={} {}'.format(dns_server, dns_domain, kubelet_args) }}"
+{% else %}
+KUBELET_ARGS="{{kubelet_args}}"
+{% endif %}

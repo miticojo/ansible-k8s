@@ -1,3 +1,0 @@
-#!/bin/bash -e
-etcdctl mkdir /kube-centos/networks
-etcdctl mk /kube-centos/network/config "{ \"Network\": \"{{network.vx_lan_network}}\", \"SubnetLen\": {{network.vx_lan_subnet_len}}, \"Backend\": { \"Type\": \"vxlan\" } }"

@@ -1,0 +1,19 @@
+- name: restart etcd
+  service: name=etcd state=restarted
+
+- name: check etcd cluster health
+  command: "{{etcdctl_cmd}} cluster-health"
+
+- name: restart etcd service
+  service: name=etcd state=restarted
+
+- name: restart kube-apiserver service
+  service: name=kube-apiserver state=restarted
+
+- name: restart kube services
+  service: name={{item}} state=restarted
+  with_items:
+  - kube-apiserver
+  - kube-controller-manager
+  - kube-scheduler
+  - kube-proxy

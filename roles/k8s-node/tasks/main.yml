@@ -1,0 +1,81 @@
+- name: Install kubernetes packages
+  yum: name={{item}}  state=present
+  with_items:
+  - docker
+  - kubernetes
+  - flannel
+
+- name: Create folder for certificates
+  file: path={{item}} state=directory mode="u=rwX,g=rX,o=rX"
+  with_items:
+  - "{{kube_certs_dir}}"
+  - "{{etcd_certs_dir}}"
+  tags: certs
+
+- name: Copy CA cert all nodes
+  copy:
+    src: "{{local_ca_folder}}/{{item}}/ca.pem"
+    dest: "{{certificates_folder}}/{{item}}/ca.pem"
+    owner: root
+    group: root
+    mode: 0644
+  with_items:
+  - kubernetes
+  - etcd
+  tags: certs
+
+- name: Copy own certs
+  copy:
+    src: "{{local_ca_folder}}/{{item}}"
+    dest: "{{certificates_folder}}/{{item}}"
+    owner: root
+    group: root
+    mode: 0644
+  with_items:
+  - "etcd/{{inventory_hostname}}.pem"
+  - "etcd/{{inventory_hostname}}-key.pem"
+  - "kubernetes/{{inventory_hostname}}.pem"
+  - "kubernetes/{{inventory_hostname}}-key.pem"
+  tags:
+  - certs
+  - etcd
+
+- name: Check flannel etcd prefix exists
+  command: "{{etcdctl_cmd}} get {{flannel_etcd_prefix}}"
+  register: check_flannel_etcd_prefix
+  failed_when: 'Key not found' not in check_flannel_etcd_prefix.stderr
+  run_once: yes
+  ignore_errors: yes
+  tags: flannel
+
+- name: Create flannel etcd prefix
+  command: "{{etcdctl_cmd}} mk {{flannel_etcd_prefix}}/config \'{\"Network\":\"{{flannel_node_network}}\"}\'"
+  when: 'Key not found' in check_flannel_etcd_prefix.stderr
+  run_once: yes
+  tags: flannel
+
+- name: Generate /etc/sysconfig/flanneld
+  template: src=etc/sysconfig/flanneld.j2 dest=/etc/sysconfig/flanneld backup=yes
+  tags: flannel
+  notify:
+  - restart flanneld service
+
+- name: Start and enable flanneld
+  service: name=flanneld state=restarted enabled=yes
+  tags: flannel
+
+- name: Generate /etc/kubernetes/kubelet
+  template: src=etc/kubernetes/kubelet.j2 dest=/etc/kubernetes/kubelet
+  tags: kubelet
+
+- name: Generate {{kubeconfig_path}}
+  template: src=kubeconfig.j2 dest={{kubeconfig_path}}
+  tags: kubelet
+
+- name: Start {{item}} service
+  service: name={{item}} state=restarted enabled=yes
+  with_items:
+  - kubelet
+  - flanneld
+  - docker
+  tags: [ kubelet, flanneld, docker ]

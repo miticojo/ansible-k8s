@@ -9,60 +9,17 @@
       generate_hostfile: no
       vx_lan_network: 172.30.0.0/16
       vx_lan_subnet_len: 24
-      flanneld_options: ''
-
-    dns:
-      deploy: no
-      cluster_ip: 10.254.254.254
-      domain: '{{domain}}'
-      federations_domain_map: ''
-
-    kubernetes:
-      kube_api_address: 0.0.0.0
-      kube_api_port: 8080
-      kube_service_addresses: 10.254.0.0/16
-      kube_api_args: ''
-      kubelet_port: 10250
-      kubelet_args: ''
-
-    etcd:
-      listen_client_urls: http://0.0.0.0:2379
-      data_dir: /var/lib/etcd/default.etcd
-      advertive_client_url: http://0.0.0.0:2379
-
-    nfs:
-      path: /exports
-      allowed_hosts: "*"
-      export_options: "rw,sync"
 
     dashboard: yes
 
-  tasks:
-  - set_fact: master_api_uri="http://{{groups["master"][0]}}:{{kubernetes.kube_api_port}}"
-    run_once: yes
-    tags: always
-
+  roles:
   - name: Prepare hosts with requirements
-    include: playbooks/requirements.yml
+    role: k8s-common
 
-  - name: Setup master hosts
-    include: playbooks/master.yml
-    when: ansible_hostname in groups['master']
-    tags: master
+  - name: Prepare master nodes
+    role: k8s-master
+    when: inventory_hostname in groups['k8s-master']
 
-  - name: Setup node hosts
-    include: playbooks/node.yml
-    when: ansible_hostname in groups['node']
-    tags: node
-
-  - name: Setup nfs server on first master
-    include: playbooks/nfs.yml
-    when: ansible_hostname in groups['master']
-    run_once: yes
-    tags: nfs
-
-  - name: Setup kubernetes addons
-    include: playbooks/k8s-addons.yml
-    when: ansible_hostname in groups['master']
-    run_once: yes
-    tags: k8s-addons
+  - name: Prepare kubelet nodes
+    role: k8s-node
+    when: inventory_hostname in groups['k8s-node']
