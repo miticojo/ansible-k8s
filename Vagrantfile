@@ -4,6 +4,14 @@
 master_hosts = 3
 node_hosts = 3
 
+plugins = [ "vagrant-hostmanager"]
+
+plugins.each do |plugin|
+  unless Vagrant.has_plugin?(plugin)
+    system("vagrant plugin install #{plugin}")
+  end
+end
+
 Vagrant.configure("2") do |config|
   config.hostmanager.enabled = true
   config.hostmanager.manage_host = true
@@ -22,6 +30,10 @@ Vagrant.configure("2") do |config|
         vb.memory = "1024"
         vb.cpus = 2
       end
+      node.vm.provider "libvirt" do |vb|
+        vb.memory = 1024
+        vb.cpus = 2
+      end
     end
   end
 
@@ -33,6 +45,11 @@ Vagrant.configure("2") do |config|
 
       node.vm.provider "virtualbox" do |vb|
         vb.memory = "2048"
+        vb.cpus = 2
+      end
+      
+      node.vm.provider "libvirt" do |vb|
+        vb.memory = 2048
         vb.cpus = 2
       end
 
