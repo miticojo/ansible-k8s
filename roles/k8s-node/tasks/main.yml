@@ -43,14 +43,14 @@
 - name: Check flannel etcd prefix exists
   command: "{{etcdctl_cmd}} get {{flannel_etcd_prefix}}"
   register: check_flannel_etcd_prefix
-  failed_when: 'Key not found' not in check_flannel_etcd_prefix.stderr
+  failed_when: '"Key not found" not in check_flannel_etcd_prefix.stderr'
   run_once: yes
   ignore_errors: yes
   tags: flannel
 
 - name: Create flannel etcd prefix
   command: "{{etcdctl_cmd}} mk {{flannel_etcd_prefix}}/config \'{\"Network\":\"{{flannel_node_network}}\"}\'"
-  when: 'Key not found' in check_flannel_etcd_prefix.stderr
+  when: '"Key not found" in check_flannel_etcd_prefix.stderr'
   run_once: yes
   tags: flannel
 
