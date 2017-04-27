@@ -17,9 +17,11 @@ kube_key_data: "{{ lookup('file', '{}/{}-key.pem'.format(kube_certs_dir, invento
 ### flannel conf ###
 flannel_etcd_prefix: /kube-centos/network
 flannel_node_network: 172.17.0.0/16
+flannel_node_subnetlen: 20
+flannel_node_backend_type: vxlan
 
 ### etcd client conf ###
 etcd_certs_dir: "{{certificates_folder}}/etcd"
 etcdctl_cmd: "etcdctl -ca-file {{etcd_certs_dir}}/ca.pem --cert-file {{etcd_certs_dir}}/{{inventory_hostname}}.pem  --key-file {{etcd_certs_dir}}/{{inventory_hostname}}-key.pem"
 
-kubelet_args: "--allow-privileged=true --tls-cert-file={{kube_certs_dir}}/{{inventory_hostname}}.pem --tls-private-key-file={{kube_certs_dir}}/{{inventory_hostname}}-key.pem  --enable_server=true --register-node=true --kubeconfig={{kubeconfig_path}} --node-status-update-frequency=5s --cluster-dns={{dns_server}} --cluster-domain={{dns_domain}}"
+kubelet_args: "--allow-privileged=true  --eviction-hard=memory.available<100Mi,nodefs.available<10%,nodefs.inodesFree<5% --tls-cert-file={{kube_certs_dir}}/{{inventory_hostname}}.pem --tls-private-key-file={{kube_certs_dir}}/{{inventory_hostname}}-key.pem  --enable_server=true --register-node=true --kubeconfig={{kubeconfig_path}} --node-status-update-frequency=5s --cluster-dns={{dns_server}} --cluster-domain={{dns_domain}}"

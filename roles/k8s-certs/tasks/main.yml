@@ -124,7 +124,7 @@
   args:
     chdir: "{{ca_folder}}/etcd"
     creates: "{{ca_folder}}/etcd/{{item}}-key.pem"
-  with_items: "{{groups['k8s-master'] }}"
+  with_items: "{{groups['k8s-node'] }}"
 
 - name: etcd |generate etcd csr file
   command: openssl req -new -key {{item}}-key.pem -out {{item}}.csr -subj "/CN={{item}}" -config worker-openssl.cnf
@@ -133,7 +133,7 @@
     creates: "{{ca_folder}}/etcd/{{item}}.csr"
   environment:
     WORKER_IP: "{{hostvars[item]['ansible_'+ network.int_iface]['ipv4']['address']}}"
-  with_items: "{{groups['k8s-master'] }}"
+  with_items: "{{groups['k8s-node'] }}"
 
 - name: etcd |generate etcd crt file
   command: openssl x509 -req -in {{item}}.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -out {{item}}.pem -days {{ca_etcd_crt_expires}} -extensions v3_req -extfile worker-openssl.cnf
@@ -142,4 +142,4 @@
     creates: "{{ca_folder}}/etcd/{{item}}.pem"
   environment:
     WORKER_IP: "{{hostvars[item]['ansible_'+ network.int_iface]['ipv4']['address']}}"
-  with_items: "{{groups['k8s-master'] }}"
+  with_items: "{{groups['k8s-node'] }}"

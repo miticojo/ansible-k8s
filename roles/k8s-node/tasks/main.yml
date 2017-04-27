@@ -49,7 +49,8 @@
   tags: flannel
 
 - name: Create flannel etcd prefix
-  command: "{{etcdctl_cmd}} mk {{flannel_etcd_prefix}}/config \'{\"Network\":\"{{flannel_node_network}}\"}\'"
+
+  command: "{{etcdctl_cmd}} mk {{flannel_etcd_prefix}}/config  \'{ \"Network\": \"{{flannel_node_network}}\", \"SubnetLen\": {{flannel_node_subnetlen}}, \"Backend\": {\"Type\": \"{{flannel_node_backend_type}}\"} }\'"
   when: '"Key not found" in check_flannel_etcd_prefix.stderr'
   run_once: yes
   tags: flannel
