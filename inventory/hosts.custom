@@ -1,15 +1,15 @@
 [k8s:children]
-master
-node
+k8s-master
+k8s-node
 
 [k8s:vars]
 ansible_ssh_user=centos
 ansible_become=yes
 
 
-[master]
+[k8s-master]
 k8s-master-01 ansible_ssh_host=10.147.20.18
 
-[node]
+[k8s-node]
 k8s-node-01 ansible_ssh_host=192.168.1.65
 k8s-node-02 ansible_ssh_host=192.168.1.66
