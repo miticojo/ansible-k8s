@@ -1,145 +1,152 @@
 # reference link followed https://coreos.com/kubernetes/docs/latest/openssl.html
 - name: wipe current ca folder
-  file: path={{ca_folder}} state=absent
-  when: ca_wipe_all == 'yes'
+  file: path={{cert_ca_dir}} state=absent
+  when: cert_ca_wipe_all
 
 - name: create folder for CA
   file: path={{item}} state=directory mode="u=rwX,g=rX,o=rX"
   with_items:
-  - "{{ca_folder}}"
-  - "{{ca_folder}}/kubernetes"
-  - "{{ca_folder}}/etcd"
+  - "{{cert_ca_dir}}"
+  - "{{cert_ca_dir}}/kubernetes"
+  - "{{cert_ca_dir}}/etcd"
+  - "{{cert_ca_dir}}/tokens"
 
 # work around needed to don't repeat certs generation each run (creates needs absolute path)
-- name: get ca_folder absolute path
+- name: get cert_ca_dir absolute path
   command: pwd
   args:
-      chdir: "{{ca_folder}}"
-  register: pwd_ca_folder
+      chdir: "{{cert_ca_dir}}"
+  register: pwd_cert_ca_dir
 
-- name: set ca_folder to absolute path
-  set_fact: ca_folder={{pwd_ca_folder.stdout}}
+- name: set cert_ca_dir to absolute path
+  set_fact: cert_ca_dir={{pwd_cert_ca_dir.stdout}}
 
 - name: k8s | generate CA key file
   command: openssl genrsa -out ca-key.pem 2048
   args:
-      chdir: "{{ca_folder}}/kubernetes"
-      creates: "{{ca_folder}}/kubernetes/ca-key.pem"
+      chdir: "{{cert_ca_dir}}/kubernetes"
+      creates: "{{cert_ca_dir}}/kubernetes/ca-key.pem"
 
 - name: k8s | generate CA crt file
-  command: openssl req -x509 -new -nodes -key ca-key.pem -days {{ca_crt_expires}} -out ca.pem -subj "/CN=kube-ca"
+  command: openssl req -x509 -new -nodes -key ca-key.pem -days {{cert_ca_crt_expires}} -out ca.pem -subj "/CN=kube-ca"
   args:
-      chdir: "{{ca_folder}}/kubernetes"
-      creates: "{{ca_folder}}/kubernetes/ca.pem"
+      chdir: "{{cert_ca_dir}}/kubernetes"
+      creates: "{{cert_ca_dir}}/kubernetes/ca.pem"
 
 - name: k8s | copy openssl.cnf file to ca folder
-  template: src=openssl.cnf.j2 dest={{ca_folder}}/kubernetes/openssl.cnf
+  template: src=openssl.cnf.j2 dest={{cert_ca_dir}}/kubernetes/openssl.cnf
 
 ####### CERTS FOR KUBE API SERVER ############
 - name: k8s | generate apiserver key file
   command: openssl genrsa -out apiserver-key.pem 2048
   args:
-    chdir: "{{ca_folder}}/kubernetes"
-    creates: "{{ca_folder}}/kubernetes/apiserver-key.pem"
+    chdir: "{{cert_ca_dir}}/kubernetes"
+    creates: "{{cert_ca_dir}}/kubernetes/apiserver-key.pem"
 
 - name: k8s | generate apiserver csr file
   command: openssl req -new -key apiserver-key.pem -out apiserver.csr -subj "/CN=kube-apiserver" -config openssl.cnf
   args:
-    chdir: "{{ca_folder}}/kubernetes"
-    creates: "{{ca_folder}}/kubernetes/apiserver.csr"
+    chdir: "{{cert_ca_dir}}/kubernetes"
+    creates: "{{cert_ca_dir}}/kubernetes/apiserver.csr"
 
 - name: k8s | generate apiserver crt file
-  command: openssl x509 -req -in apiserver.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -out apiserver.pem -days {{ca_apiserver_crt_expires}} -extensions v3_req -extfile openssl.cnf
+  command: openssl x509 -req -in apiserver.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -out apiserver.pem -days {{cert_ca_apiserver_crt_expires}} -extensions v3_req -extfile openssl.cnf
   args:
-    chdir: "{{ca_folder}}/kubernetes"
-    creates: "{{ca_folder}}/kubernetes/apiserver.pem"
+    chdir: "{{cert_ca_dir}}/kubernetes"
+    creates: "{{cert_ca_dir}}/kubernetes/apiserver.pem"
 
 ###### CERTS FOR KUBLET #########
 - name: k8s | copy worker-openssl.cnf file to ca folder
-  template: src=worker-openssl.cnf.j2 dest={{ca_folder}}/kubernetes/worker-openssl.cnf
+  template: src=worker-openssl.cnf.j2 dest={{cert_ca_dir}}/kubernetes/worker-openssl.cnf
 
 - name: k8s | generate kubelet key file
   command: openssl genrsa -out {{item}}-key.pem 2048
   args:
-    chdir: "{{ca_folder}}/kubernetes"
-    creates: "{{ca_folder}}/kubernetes/{{item}}-key.pem"
-  with_items: "{{groups['k8s-node'] }}"
+    chdir: "{{cert_ca_dir}}/kubernetes"
+    creates: "{{cert_ca_dir}}/kubernetes/{{item}}-key.pem"
+  with_items: "{{groups['k8s'] }}"
 
 - name: k8s | generate kubelet csr file
   command: openssl req -new -key {{item}}-key.pem -out {{item}}.csr -subj "/CN={{item}}" -config worker-openssl.cnf
   args:
-    chdir: "{{ca_folder}}/kubernetes"
-    creates: "{{ca_folder}}/kubernetes/{{item}}.csr"
+    chdir: "{{cert_ca_dir}}/kubernetes"
+    creates: "{{cert_ca_dir}}/kubernetes/{{item}}.csr"
   environment:
-    WORKER_IP: "{{hostvars[item]['ansible_'+ network.int_iface]['ipv4']['address']}}"
-  with_items: "{{groups['k8s-node'] }}"
+    WORKER_IP: "{{hostvars[item]['ansible_'+ k8s_net_iface]['ipv4']['address']}}"
+  with_items: "{{groups['k8s'] }}"
 
 - name: k8s | generate kubelet crt file
-  command: openssl x509 -req -in {{item}}.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -out {{item}}.pem -days {{ca_apiserver_crt_expires}} -extensions v3_req -extfile worker-openssl.cnf
+  command: openssl x509 -req -in {{item}}.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -out {{item}}.pem -days {{cert_ca_apiserver_crt_expires}} -extensions v3_req -extfile worker-openssl.cnf
   args:
-    chdir: "{{ca_folder}}/kubernetes"
-    creates: "{{ca_folder}}/kubernetes/{{item}}.pem"
+    chdir: "{{cert_ca_dir}}/kubernetes"
+    creates: "{{cert_ca_dir}}/kubernetes/{{item}}.pem"
   environment:
-    WORKER_IP: "{{hostvars[item]['ansible_'+ network.int_iface]['ipv4']['address']}}"
-  with_items: "{{groups['k8s-node'] }}"
+    WORKER_IP: "{{hostvars[item]['ansible_'+ k8s_net_iface]['ipv4']['address']}}"
+  with_items: "{{groups['k8s'] }}"
 
 ###### KUBE ADMIN CERT #########
 - name: admin | generate administrator key file
   command: openssl genrsa -out admin-key.pem 2048
   args:
-      chdir: "{{ca_folder}}/kubernetes"
-      creates: "{{ca_folder}}/kubernetes/admin-key.pem"
+      chdir: "{{cert_ca_dir}}/kubernetes"
+      creates: "{{cert_ca_dir}}/kubernetes/admin-key.pem"
 
 - name: admin | generate administrator csr file
   command: openssl req -new -key admin-key.pem -out admin.csr -subj "/CN=kube-admin"
   args:
-      chdir: "{{ca_folder}}/kubernetes"
-      creates: "{{ca_folder}}/kubernetes/admin.csr"
+      chdir: "{{cert_ca_dir}}/kubernetes"
+      creates: "{{cert_ca_dir}}/kubernetes/admin.csr"
 
 - name: admin | generate administrator crt file
-  command: openssl x509 -req -in admin.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -out admin.pem -days {{ca_apiserver_crt_expires}}
+  command: openssl x509 -req -in admin.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -out admin.pem -days {{cert_ca_apiserver_crt_expires}}
   args:
-      chdir: "{{ca_folder}}/kubernetes"
-      creates: "{{ca_folder}}/kubernetes/admin.pem"
+      chdir: "{{cert_ca_dir}}/kubernetes"
+      creates: "{{cert_ca_dir}}/kubernetes/admin.pem"
 
 ######## ETCD CERTS ########
 
 - name: etcd | generate CA key file
   command: openssl genrsa -out ca-key.pem 2048
   args:
-      chdir: "{{ca_folder}}/etcd"
-      creates: "{{ca_folder}}/etcd/ca-key.pem"
+      chdir: "{{cert_ca_dir}}/etcd"
+      creates: "{{cert_ca_dir}}/etcd/ca-key.pem"
 
 - name: etcd | generate CA crt file
-  command: openssl req -x509 -new -nodes -key ca-key.pem -days {{ca_crt_expires}} -out ca.pem -subj "/CN=etcd-ca"
+  command: openssl req -x509 -new -nodes -key ca-key.pem -days {{cert_ca_crt_expires}} -out ca.pem -subj "/CN=etcd-ca"
   args:
-      chdir: "{{ca_folder}}/etcd"
-      creates: "{{ca_folder}}/etcd/ca.pem"
+      chdir: "{{cert_ca_dir}}/etcd"
+      creates: "{{cert_ca_dir}}/etcd/ca.pem"
 
 - name: etcd | copy worker-openssl.cnf file to ca folder
-  template: src=worker-openssl.cnf.j2 dest={{ca_folder}}/etcd/worker-openssl.cnf
+  template: src=worker-openssl.cnf.j2 dest={{cert_ca_dir}}/etcd/worker-openssl.cnf
 
 - name: etcd | generate etcd key file
   command: openssl genrsa -out {{item}}-key.pem 2048
   args:
-    chdir: "{{ca_folder}}/etcd"
-    creates: "{{ca_folder}}/etcd/{{item}}-key.pem"
-  with_items: "{{groups['k8s-node'] }}"
+    chdir: "{{cert_ca_dir}}/etcd"
+    creates: "{{cert_ca_dir}}/etcd/{{item}}-key.pem"
+  with_items: "{{ groups['k8s-master'] + groups['k8s-node'] }}"
 
 - name: etcd |generate etcd csr file
   command: openssl req -new -key {{item}}-key.pem -out {{item}}.csr -subj "/CN={{item}}" -config worker-openssl.cnf
   args:
-    chdir: "{{ca_folder}}/etcd"
-    creates: "{{ca_folder}}/etcd/{{item}}.csr"
+    chdir: "{{cert_ca_dir}}/etcd"
+    creates: "{{cert_ca_dir}}/etcd/{{item}}.csr"
   environment:
-    WORKER_IP: "{{hostvars[item]['ansible_'+ network.int_iface]['ipv4']['address']}}"
-  with_items: "{{groups['k8s-node'] }}"
+    WORKER_IP: "{{hostvars[item]['ansible_'+ k8s_net_iface]['ipv4']['address']}}"
+  with_items: "{{ groups['k8s-master'] + groups['k8s-node']  }}"
 
 - name: etcd |generate etcd crt file
-  command: openssl x509 -req -in {{item}}.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -out {{item}}.pem -days {{ca_etcd_crt_expires}} -extensions v3_req -extfile worker-openssl.cnf
+  command: openssl x509 -req -in {{item}}.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -out {{item}}.pem -days {{cert_ca_etcd_crt_expires}} -extensions v3_req -extfile worker-openssl.cnf
   args:
-    chdir: "{{ca_folder}}/etcd"
-    creates: "{{ca_folder}}/etcd/{{item}}.pem"
+    chdir: "{{cert_ca_dir}}/etcd"
+    creates: "{{cert_ca_dir}}/etcd/{{item}}.pem"
   environment:
-    WORKER_IP: "{{hostvars[item]['ansible_'+ network.int_iface]['ipv4']['address']}}"
-  with_items: "{{groups['k8s-node'] }}"
+    WORKER_IP: "{{hostvars[item]['ansible_'+ k8s_net_iface]['ipv4']['address']}}"
+  with_items: "{{ groups['k8s-master'] + groups['k8s-node']  }}"
+
+######## ACCOUNT TOKENS #######
+- name: TOKEN | Generate token for accounts
+  template:
+    src: known_tokens.csv.j2
+    dest: "{{cert_ca_dir}}/tokens/known_tokens.csv"

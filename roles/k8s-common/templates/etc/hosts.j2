@@ -10,5 +10,5 @@ ff02::2     ip6-allrouters
 
 # Network nodes as generated through Ansible.
 {% for host in groups["k8s"] %}
-{{ hostvars[host]['ansible_'+ network.int_iface]['ipv4']['address'] }}  {{ host }}
+{{ hostvars[host]['ansible_'+ k8s_net_iface]['ipv4']['address'] }}  {{ host }}
 {% endfor %}

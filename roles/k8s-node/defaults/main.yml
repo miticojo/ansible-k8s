@@ -1,27 +1,40 @@
-dns_domain: cluster.local
-dns_server: 10.254.254.254
-
-kube_master_ip: "{{groups['k8s-master'][0]}}"
-kube_master_api_uri: "https://{{kube_master_ip}}:{{kube_api_secure_port}}"
-
-kubeconfig_path: /etc/kubernetes/kubelet-kubeconfig.yml
-
-certificates_folder: /etc/kubernetes/ssl       # remote target path for certificats
-etcd_certs_dir: "{{certificates_folder}}/etcd"
-kube_certs_dir: "{{certificates_folder}}/kubernetes"
-
-kube_ca_data: "{{ lookup('file', '{}/ca.pem'.format(kube_certs_dir)) }}"
-kube_cert_data: "{{ lookup('file', '{}/{}.pem'.format(kube_certs_dir, inventory_hostname)) }}"
-kube_key_data: "{{ lookup('file', '{}/{}-key.pem'.format(kube_certs_dir, inventory_hostname)) }}"
-
-### flannel conf ###
-flannel_etcd_prefix: /kube-centos/network
-flannel_node_network: 172.17.0.0/16
-flannel_node_subnetlen: 20
-flannel_node_backend_type: vxlan
-
-### etcd client conf ###
-etcd_certs_dir: "{{certificates_folder}}/etcd"
-etcdctl_cmd: "etcdctl -ca-file {{etcd_certs_dir}}/ca.pem --cert-file {{etcd_certs_dir}}/{{inventory_hostname}}.pem  --key-file {{etcd_certs_dir}}/{{inventory_hostname}}-key.pem"
-
-kubelet_args: "--allow-privileged=true  --eviction-hard=memory.available<100Mi,nodefs.available<10%,nodefs.inodesFree<5% --tls-cert-file={{kube_certs_dir}}/{{inventory_hostname}}.pem --tls-private-key-file={{kube_certs_dir}}/{{inventory_hostname}}-key.pem  --enable_server=true --register-node=true --kubeconfig={{kubeconfig_path}} --node-status-update-frequency=5s --cluster-dns={{dns_server}} --cluster-domain={{dns_domain}}"
+# dns_domain: cluster.local
+# dns_server: 10.254.254.254
+#
+# k8s_net_iface: eth0
+#
+# kube_master_ip: "{{groups['k8s-master'][0]}}"
+# kube_master_api_uri: "https://{{kube_master_ip}}:{{kube_api_secure_port}}"
+#
+# kubeconfig_path: /etc/kubernetes/kubelet-kubeconfig.yml
+#
+# certificates_dir: /etc/kubernetes/ssl       # remote target path for certificats
+# etcd_certs_dir: "{{certificates_dir}}/etcd"
+# kube_certs_dir: "{{certificates_dir}}/kubernetes"
+#
+# kube_ca_data: "{{ lookup('file', '{}/ca.pem'.format(kube_certs_dir)) }}"
+# kube_cert_data: "{{ lookup('file', '{}/{}.pem'.format(kube_certs_dir, inventory_hostname)) }}"
+# kube_key_data: "{{ lookup('file', '{}/{}-key.pem'.format(kube_certs_dir, inventory_hostname)) }}"
+#
+# ### flannel conf ###
+# flannel_etcd_prefix: /kube-centos/network
+# flannel_node_network: 172.17.0.0/16
+# flannel_node_subnetlen: 20
+# flannel_node_backend_type: vxlan
+#
+# ### etcd client conf ###
+# etcd_certs_dir: "{{certificates_dir}}/etcd"
+# etcdctl_cmd: "etcdctl -ca-file {{etcd_certs_dir}}/ca.pem --cert-file {{etcd_certs_dir}}/{{inventory_hostname}}.pem  --key-file {{etcd_certs_dir}}/{{inventory_hostname}}-key.pem"
+#
+# ### kubelet conf ###
+# kubelet_args:
+# - "--allow-privileged=true"
+# - "--eviction-hard=memory.available<100Mi,nodefs.available<10%,nodefs.inodesFree<5%"
+# - "--tls-cert-file={{kube_certs_dir}}/{{inventory_hostname}}.pem"
+# - "--tls-private-key-file={{kube_certs_dir}}/{{inventory_hostname}}-key.pem"
+# - "--enable_server=true"
+# - "--register-node=true"
+# - "--kubeconfig={{kubeconfig_path}}"
+# - "--node-status-update-frequency=5s"
+# - "--cluster-dns={{dns_server}}"
+# - "--cluster-domain={{dns_domain}}"

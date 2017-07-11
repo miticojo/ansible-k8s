@@ -1,9 +1,8 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
 
-master_hosts = (ENV['NUM_MASTERS'] || 2).to_i
-node_hosts = (ENV['NUM_NODES'] || 1).to_i
-
+master_hosts = (ENV['NUM_MASTERS'] || 3).to_i
+node_hosts = (ENV['NUM_NODES'] || 2).to_i
 
 plugins = [ "vagrant-hostmanager"]
 
@@ -70,11 +69,13 @@ Vagrant.configure("2") do |config|
           ansible.groups = {
             "k8s-master" => ["kube-m[1:#{master_hosts}]"],
             "k8s-infra" => ["kube-m[1:#{master_hosts}]"],
-            "k8s-node" => ["kube-n[1:#{node_hosts}]", "kube-m[1:#{master_hosts}]"],
+            "k8s-node" => ["kube-n[1:#{node_hosts}]"],
             "k8s:children" => ["k8s-master", "k8s-infra","k8s-node"],
           }
           ansible.limit = "all"
-          ansible.sudo = true
+          ansible.extra_vars = {
+            "k8s_net_iface": "eth1"
+          }
         end
       end
     end

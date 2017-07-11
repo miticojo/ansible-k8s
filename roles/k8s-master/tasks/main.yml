@@ -4,19 +4,13 @@
   - kubernetes
   - etcd
 
-- name: Generate certificates
-  include_role:
-    name: k8s-certs
+- name: Copy CA folder from first master SERVER
+  command: "rsync -arvce 'ssh -o StrictHostKeyChecking=no' \
+    --rsync-path='sudo rsync'  {{k8s_admin_user}}@{{inventory_hostname}}:{{cert_ca_dir}}/ \
+    {{cert_ca_dir_tmp}}/"
+  run_once: yes
   delegate_to: localhost
-  run_once: yes
   become: no
-  tags: certs
-
-- name: Copy CA folder to first master SERVER
-  copy:
-    src: "{{local_ca_folder}}/"
-    dest: "{{ca_folder}}"
-  run_once: yes
   tags: certs
 
 - name: Create folder for certificates
@@ -24,12 +18,13 @@
   with_items:
   - "{{kube_certs_dir}}"
   - "{{etcd_certs_dir}}"
+  - "{{token_dir}}"
   tags: certs
 
 - name: Copy CA cert all nodes
   copy:
-    src: "{{local_ca_folder}}/{{item}}/ca.pem"
-    dest: "{{certificates_folder}}/{{item}}/ca.pem"
+    src: "{{cert_ca_dir_tmp}}/{{item}}/ca.pem"
+    dest: "{{k8s_cert_dir}}/{{item}}/ca.pem"
     owner: root
     group: root
     mode: 0644
@@ -40,8 +35,8 @@
 
 - name: Copy own etcd certs
   copy:
-    src: "{{local_ca_folder}}/{{item}}"
-    dest: "{{certificates_folder}}/{{item}}"
+    src: "{{cert_ca_dir_tmp}}/{{item}}"
+    dest: "{{k8s_cert_dir}}/{{item}}"
     owner: root
     group: root
     mode: 0644
@@ -52,6 +47,17 @@
   - certs
   - etcd
 
+- name: Copy tokens file
+  copy:
+    src: "{{cert_ca_dir_tmp}}/tokens/known_tokens.csv"
+    dest: "{{token_dir}}/known_tokens.csv"
+    owner: root
+    group: root
+    mode: 0644
+  tags:
+  - tokens
+
+
 - name: Generate /etc/etcd/etcd.conf
   template: src=etc/etcd/etcd.conf.j2 dest=/etc/etcd/etcd.conf backup=yes
   tags: etcd
@@ -59,15 +65,13 @@
   - restart etcd service
   - check etcd cluster health
 
-- name: Start Etcd service
-  service: name=etcd state=restarted enabled=yes
-  tags: etcd
-  notify: check etcd cluster health
+- name: Force all notified handlers to run at this point, not waiting for normal sync points
+  meta: flush_handlers
 
 - name: Copy own kube-apiserver certs
   copy:
-    src: "{{local_ca_folder}}/{{item}}"
-    dest: "{{certificates_folder}}/{{item}}"
+    src: "{{cert_ca_dir_tmp}}/{{item}}"
+    dest: "{{k8s_cert_dir}}/{{item}}"
     owner: root
     group: root
     mode: 0644
@@ -77,6 +81,13 @@
   tags:
   - certs
   - kube-apiserver
+
+- name: Load API Certs
+  set_fact:
+    cert_ca_crt: "{{ lookup('pipe', 'cat {{cert_ca_dir}}/kubernetes/ca.pem | base64') }}"
+    cert_admin_crt: "{{ lookup('pipe', 'cat {{cert_ca_dir}}/kubernetes/admin.pem | base64') }}"
+    cert_admin_key:  "{{ lookup('pipe', 'cat {{cert_ca_dir}}/kubernetes/admin-key.pem | base64') }}"
+  run_once: yes
 
 - name: Generate /etc/kubernetes/apiserver
   template: src=etc/kubernetes/apiserver.j2 dest=/etc/kubernetes/apiserver backup=yes
@@ -101,6 +112,8 @@
     dest: /etc/kubernetes/scheduler
   - src: etc/kubernetes/proxy.j2
     dest: /etc/kubernetes/proxy
+  - src: etc/kubernetes/kubeconfig.j2
+    dest: /etc/kubernetes/admin.kubeconfig
   tags:
   - kube-apiserver
   - kube-controller-manager
@@ -120,3 +133,20 @@
   - kube-controller-manager
   - kube-scheduler
   - kube-proxy
+
+- name: Check flannel etcd prefix exists
+  command: "{{etcdctl_cmd}} get {{flannel_etcd_prefix}}"
+  register: check_flannel_etcd_prefix
+  failed_when: '"Key not found" not in check_flannel_etcd_prefix.stderr'
+  run_once: yes
+  ignore_errors: yes
+  tags: flannel
+
+- name: Create flannel etcd prefix
+  command: "{{etcdctl_cmd}} mk {{flannel_etcd_prefix}}/config  \'{ \"Network\": \"{{flannel_node_network}}\", \"SubnetLen\": {{flannel_node_subnetlen}}, \"Backend\": {\"Type\": \"{{flannel_node_backend_type}}\"} }\'"
+  when: '"Key not found" in check_flannel_etcd_prefix.stderr'
+  run_once: yes
+  tags: flannel
+
+- name: Force all notified handlers to run at this point, not waiting for normal sync points
+  meta: flush_handlers

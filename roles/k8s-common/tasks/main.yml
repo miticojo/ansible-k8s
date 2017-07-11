@@ -1,20 +1,17 @@
-- name: Disable selinux
-  selinux: state=disabled
-  tags:
-  - selinux
-  - config
-  - security
+- name : Set machine hostname
+  hostname: name="{{inventory_hostname}}"
 
-- name: Disable firewall
-  service: name={{item}} state=stopped enabled=false
-  with_items:
-  - iptables-services
-  - firewalld
-  ignore_errors: yes
+- name: Generate /etc/hosts file
+  template:
+    src=etc/hosts.j2
+    dest=/etc/hosts
   tags:
+  - hosts
   - config
-  - firewall
-  - security
+
+- name: Include security configurations
+  include: security.yml
+  tags: security
 
 - name: Install base packages
   yum: name={{item}}  state=present
@@ -26,26 +23,9 @@
   tags: ntp
 
 - name: setup ntp server
-  lineinfile: regexp="^server" line="server {{item}} iburst" dest=/etc/ntp.conf backup=yes
+  lineinfile: regexp="^server" line="server {{item}} iburst" dest=/etc/chrony.conf backup=yes
   with_items: "{{ntp_servers}}"
-  notify: restart ntp
-  tags:
-  - ntp
-  - config
-
-- name: sync time and hwclock
-  shell: systemctl stop ntpd && ntpdate {{ntp_servers[0]}} && hwclock -w && systemctl start ntpd
-  tags:
-  - ntp
-
-- name: start and enable ntp server
-  service: name=ntpd enabled=yes
+  notify: restart chrony
   tags: ntp
 
-- name: Generate /etc/hosts file
-  template:
-    src=etc/hosts.j2
-    dest=/etc/hosts
-  tags:
-  - hosts
-  - config
+- meta: flush_handlers

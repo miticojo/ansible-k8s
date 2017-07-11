@@ -1,5 +1,3 @@
-{% set master= groups["master"][0] %}
-
 # Copyright 2015 Google Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -57,7 +55,7 @@ spec:
           # Uncomment the following line to manually specify Kubernetes API server Host
           # If not specified, Dashboard will attempt to auto discover the API server and connect
           # to it. Uncomment only if the default does not work.
-          - --apiserver-host={{master_api_uri}}
+          - --apiserver-host=kubernetes
         livenessProbe:
           httpGet:
             path: /

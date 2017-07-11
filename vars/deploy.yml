@@ -1,0 +1,85 @@
+timezone: UTC
+
+base_packages:
+- chrony
+
+ntp_servers:
+- 0.centos.pool.ntp.org
+- 1.centos.pool.ntp.org
+- 2.centos.pool.ntp.org
+- 3.centos.pool.ntp.org
+
+# dns configuration
+dns_internal_domain: cluster.local
+dns_external_domain: example.com
+
+# certificate configuration
+cert_ca_wipe_all: no                        # wipe current folder
+cert_ca_dir: /opt/kubernetes_ca             # remote target path for entire CA folder (only on master 1)
+cert_ca_crt_expires: 3650
+cert_ca_apiserver_crt_expires:  3650
+cert_ca_etcd_crt_expires: 3650
+cert_ca_dir_tmp: /tmp/kubernetes_ca
+
+### etcd conf ###
+etcd_initial_cluster_token: "etc-cluster-{{ansible_date_time.epoch}}"
+etcd_data_dir: "/var/lib/etcd"
+etcd_certs_dir: "{{certificates_dir}}/etcd"
+etcdctl_cmd: "etcdctl -ca-file {{etcd_certs_dir}}/ca.pem --cert-file {{etcd_certs_dir}}/{{inventory_hostname}}.pem  --key-file {{etcd_certs_dir}}/{{inventory_hostname}}-key.pem"
+
+### flannel conf ###
+flannel_etcd_prefix: /kube-centos/network
+flannel_node_network: 172.17.0.0/16
+flannel_node_subnetlen: 20
+flannel_node_backend_type: vxlan
+
+# generic k8s configuration
+k8s_conf_dir: /etc/kubernetes
+k8s_cert_dir: "{{k8s_conf_dir}}/ssl"       # remote target path for certificats
+k8s_token_dir: "{{k8s_conf_dir}}/tokens"
+k8s_admin_group: k8s-admins
+k8s_admin_user: k8s-admin
+k8s_net_iface: eth0
+
+### kube api conf ###
+kube_master_api_lb: no
+kube_certs_dir: "{{certificates_dir}}/kubernetes"
+kube_master_ip: "{{groups['k8s-master'][0]}}"
+kube_master_api_uri: "https://{{kube_master_ip}}:{{kube_api_secure_port}}"
+kube_api_secure_port: 6443
+kube_service_addresses: 10.254.0.0/16
+kube_dns_address: 10.254.254.254
+kube_api_admission_control:
+- NamespaceLifecycle
+- LimitRanger
+- ServiceAccount
+- ResourceQuota
+kube_api_args:
+- "--token-auth-file={{token_dir}}/known_tokens.csv"
+- "--etcd-cafile {{etcd_certs_dir}}/ca.pem"
+- "--etcd-certfile {{etcd_certs_dir}}/{{inventory_hostname}}.pem"
+- "--etcd-keyfile={{etcd_certs_dir}}/{{inventory_hostname}}-key.pem"
+- "--kubelet-https=true --client-ca-file={{kube_certs_dir}}/ca.pem"
+- "--tls-cert-file={{kube_certs_dir}}/apiserver.pem"
+- "--tls-private-key-file={{kube_certs_dir}}/apiserver-key.pem"
+- "--service-account-key-file={{kube_certs_dir}}/apiserver-key.pem"
+
+### kube controller
+kube_ctrlmng_args:
+- "--root-ca-file={{kube_certs_dir}}/ca.pem"
+- "--service-account-private-key-file={{kube_certs_dir}}/apiserver-key.pem"
+
+### kubelet conf ###
+kubelet_port: 10250
+kubelet_kubeconfig: "{{k8s_conf_dir}}/kubelet.kubeconfig"
+kubelet_args:
+- "--allow-privileged=true"
+- "--eviction-hard=memory.available<100Mi,nodefs.available<10%,nodefs.inodesFree<5%"
+- "--tls-cert-file={{kube_certs_dir}}/{{inventory_hostname}}.pem"
+- "--tls-private-key-file={{kube_certs_dir}}/{{inventory_hostname}}-key.pem"
+- "--enable_server=true"
+- "--register-node=true"
+- "--kubeconfig={{kubelet_kubeconfig}}"
+- "--node-status-update-frequency=5s"
+- "--cluster-dns={{kube_dns_address}}"
+- "--cluster-domain={{dns_internal_domain}}"

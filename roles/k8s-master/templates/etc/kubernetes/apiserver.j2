@@ -1,15 +1,15 @@
 # {{ ansible_managed }}
 
 # The address on the local server to listen to.
-KUBE_API_ADDRESS="--insecure-bind-address={{kube_api_insecure_address}} --bind-address=0.0.0.0"
+KUBE_API_ADDRESS="--insecure-bind-address=127.0.0.1"
 
 # The port on the local server to listen on.
-KUBE_API_PORT="--insecure-port={{kube_api_insecure_port}} --secure-port {{kube_api_secure_port}}"
+KUBE_API_PORT="--secure-port {{kube_api_secure_port}}"
 
 # Comma separated list of nodes in the etcd cluster
 KUBE_ETCD_SERVERS="--etcd_servers=
 {%-for host in groups["k8s-master"] %}
-https://{{hostvars[host]['ansible_'+ network.int_iface]['ipv4']['address']}}:2379
+https://{{hostvars[host]['ansible_'+ k8s_net_iface]['ipv4']['address']}}:2379
 {%-if not loop.last %},{%endif%}
 {% endfor %}"
 
@@ -19,5 +19,8 @@ KUBELET_PORT="--kubelet-port={{kubelet_port}}"
 # Address range to use for services
 KUBE_SERVICE_ADDRESSES="--service-cluster-ip-range={{kube_service_addresses}}"
 
+# Admission control policies
+KUBE_ADMISSION_CONTROL="--admission-control={{kube_api_admission_control| join(',')}}"
+
 # Add your own!
-KUBE_API_ARGS="{{kube_api_args}}"
+KUBE_API_ARGS="{{kube_api_args | join(' ')}}"

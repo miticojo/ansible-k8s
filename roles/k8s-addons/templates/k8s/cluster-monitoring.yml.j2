@@ -1,0 +1,255 @@
+# This file should be kept in sync with cluster/gce/coreos/kube-manifests/addons/cluster-monitoring/influxdb/grafan-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: monitoring-grafana
+  namespace: kube-system
+  labels:
+    kubernetes.io/cluster-service: "true"
+    kubernetes.io/name: "Grafana"
+spec:
+  # On production clusters, consider setting up auth for grafana, and
+  # exposing Grafana either using a LoadBalancer or a public IP.
+  # type: LoadBalancer
+  ports:
+    - port: 80
+      targetPort: 3000
+  selector:
+    k8s-app: influxGrafana
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: heapster-v1.2.0
+  namespace: kube-system
+  labels:
+    k8s-app: heapster
+    kubernetes.io/cluster-service: "true"
+    version: v1.2.0
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      k8s-app: heapster
+      version: v1.2.0
+  template:
+    metadata:
+      labels:
+        k8s-app: heapster
+        version: v1.2.0
+      annotations:
+        scheduler.alpha.kubernetes.io/critical-pod: ''
+        scheduler.alpha.kubernetes.io/tolerations: '[{"key":"CriticalAddonsOnly", "operator":"Exists"}]'
+    spec:
+      containers:
+        - image: gcr.io/google_containers/heapster:v1.2.0
+          name: heapster
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8082
+              scheme: HTTP
+            initialDelaySeconds: 180
+            timeoutSeconds: 5
+          resources:
+            # keep request = limit to keep this container in guaranteed class
+            limits:
+              cpu: 81m
+              memory: 204Mi
+            requests:
+              cpu: 81m
+              memory: 204Mi
+          command:
+            - /heapster
+            - --logtostderr=true
+            - --source=kubernetes.summary_api:''
+            - --sink=influxdb:http://monitoring-influxdb:8086
+        - image: gcr.io/google_containers/heapster:v1.2.0
+          name: eventer
+          resources:
+            # keep request = limit to keep this container in guaranteed class
+            limits:
+              cpu: 100m
+              memory: 205300Ki
+            requests:
+              cpu: 100m
+              memory: 205300Ki
+          command:
+            - /eventer
+            - --logtostderr=true
+            - --source=kubernetes:''
+            - --sink=influxdb:http://monitoring-influxdb:8086
+        - image: gcr.io/google_containers/addon-resizer:1.6
+          name: heapster-nanny
+          resources:
+            limits:
+              cpu: 50m
+              memory: 92360Ki
+            requests:
+              cpu: 50m
+              memory: 92360Ki
+          env:
+            - name: MY_POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: MY_POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          command:
+            - /pod_nanny
+            - --cpu=80m
+            - --extra-cpu=0.5m
+            - --memory=200Mi
+            - --extra-memory=4Mi
+            - --threshold=5
+            - --deployment=heapster-v1.2.0
+            - --container=heapster
+            - --poll-period=300000
+            - --estimator=exponential
+        - image: gcr.io/google_containers/addon-resizer:1.6
+          name: eventer-nanny
+          resources:
+            limits:
+              cpu: 50m
+              memory: 92360Ki
+            requests:
+              cpu: 50m
+              memory: 92360Ki
+          env:
+            - name: MY_POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: MY_POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          command:
+            - /pod_nanny
+            - --cpu=100m
+            - --extra-cpu=0m
+            - --memory=200Mi
+            - --extra-memory=500
+            - --threshold=5
+            - --deployment=heapster-v1.2.0
+            - --container=eventer
+            - --poll-period=300000
+            - --estimator=exponential
+      securityContext:
+        seLinuxOptions:
+          type: spc_t
+---
+# This file should be kept in sync with cluster/gce/coreos/kube-manifests/addons/cluster-monitoring/influxdb/heapster-service.yaml
+kind: Service
+apiVersion: v1
+metadata:
+  name: heapster
+  namespace: kube-system
+  labels:
+    kubernetes.io/cluster-service: "true"
+    kubernetes.io/name: "Heapster"
+spec:
+  ports:
+    - port: 80
+      targetPort: 8082
+  selector:
+    k8s-app: heapster
+# This file should be kept in sync with cluster/gce/coreos/kube-manifests/addons/cluster-monitoring/influxdb/influxdb-grafana-controller.yaml
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: monitoring-influxdb-grafana-v3
+  namespace: kube-system
+  labels:
+    k8s-app: influxGrafana
+    version: v3
+    kubernetes.io/cluster-service: "true"
+spec:
+  replicas: 1
+  selector:
+    k8s-app: influxGrafana
+    version: v3
+  template:
+    metadata:
+      labels:
+        k8s-app: influxGrafana
+        version: v3
+        kubernetes.io/cluster-service: "true"
+    spec:
+      containers:
+        - image: gcr.io/google_containers/heapster_influxdb:v0.7
+          name: influxdb
+          resources:
+            # keep request = limit to keep this container in guaranteed class
+            limits:
+              cpu: 100m
+              memory: 500Mi
+            requests:
+              cpu: 100m
+              memory: 500Mi
+          ports:
+            - containerPort: 8083
+            - containerPort: 8086
+          volumeMounts:
+          - name: influxdb-persistent-storage
+            mountPath: /data
+        - image: gcr.io/google_containers/heapster_grafana:v3.1.1
+          name: grafana
+          env:
+          resources:
+            # keep request = limit to keep this container in guaranteed class
+            limits:
+              cpu: 100m
+              memory: 100Mi
+            requests:
+              cpu: 100m
+              memory: 100Mi
+          env:
+            # This variable is required to setup templates in Grafana.
+            - name: INFLUXDB_SERVICE_URL
+              value: http://monitoring-influxdb:8086
+              # The following env variables are required to make Grafana accessible via
+              # the kubernetes api-server proxy. On production clusters, we recommend
+              # removing these env variables, setup auth for grafana, and expose the grafana
+              # service using a LoadBalancer or a public IP.
+            - name: GF_AUTH_BASIC_ENABLED
+              value: "false"
+            - name: GF_AUTH_ANONYMOUS_ENABLED
+              value: "true"
+            - name: GF_AUTH_ANONYMOUS_ORG_ROLE
+              value: Admin
+            - name: GF_SERVER_ROOT_URL
+              value: /api/v1/proxy/namespaces/kube-system/services/monitoring-grafana/
+          volumeMounts:
+          - name: grafana-persistent-storage
+            mountPath: /var
+      volumes:
+      - name: influxdb-persistent-storage
+        emptyDir: {}
+      - name: grafana-persistent-storage
+        emptyDir: {}
+      securityContext:
+        seLinuxOptions:
+          type: spc_t
+---
+# This file should be kept in sync with cluster/gce/coreos/kube-manifests/addons/cluster-monitoring/influxdb/influxdb-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: monitoring-influxdb
+  namespace: kube-system
+  labels:
+    kubernetes.io/cluster-service: "true"
+    kubernetes.io/name: "InfluxDB"
+spec:
+  ports:
+    - name: http
+      port: 8083
+      targetPort: 8083
+    - name: api
+      port: 8086
+      targetPort: 8086
+  selector:
+    k8s-app: influxGrafana

@@ -1,0 +1,66 @@
+
+- name: Get current local user public key if exist
+  command: cat ~/.ssh/id_rsa.pub
+  args:
+    removes: ~/.ssh/id_rsa.pub
+  delegate_to: localhost
+  register: user_pub_key
+  become: no
+
+- name: Create installation/admin group
+  group: name="{{k8s_admin_group}}" state=present
+
+- name: Create installation/admin user
+  user:
+    name: "{{k8s_admin_user}}"
+    comment: "Kubernetes admin"
+    group: "{{k8s_admin_group}}"
+    state: present
+
+- name: Add authorized keys for admin
+  authorized_key: user="{{k8s_admin_user}}" key="{{user_pub_key.stdout}}"
+
+- name: Disable Root Login for SSHD
+  lineinfile: regexp="{{item.regexp}}" line="{{item.line}}" dest=/etc/ssh/sshd_config backup=yes
+  with_items:
+  - regexp: "^PermitRootLogin"
+    line: "PermitRootLogin no"
+  - regexp: "^PasswordAuthentication"
+    line: "PasswordAuthentication no"
+  notify: restart ssh
+
+- name: Set sudoers for {{k8s_admin_group}}
+  lineinfile:
+    line: "%{{k8s_admin_group}} ALL=(ALL) NOPASSWD: ALL"
+    dest: /etc/sudoers.d/k8s
+    state: present
+    create: yes
+
+- name: Disable selinux
+  selinux: state=disabled
+  register: set_selinux
+
+- name: Disable firewall
+  service: name={{item}} state=stopped enabled=false
+  with_items:
+  - iptables-services
+  - firewalld
+  ignore_errors: yes
+
+- name: Reboot nodes
+  shell: sleep 2 && shutdown -r now "Ansible reboot"
+  async: 1
+  poll: 0
+  ignore_errors: true
+  when: set_selinux|changed
+
+- name: Wait for server to come back
+  local_action: wait_for
+  args:
+    host: "{{ inventory_hostname }}"
+    port: 22
+    state: started
+    delay: 30
+    timeout: 300
+  become: no
+  when: set_selinux|changed

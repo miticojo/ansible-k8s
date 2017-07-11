@@ -14,8 +14,8 @@
 
 - name: Copy CA cert all nodes
   copy:
-    src: "{{local_ca_folder}}/{{item}}/ca.pem"
-    dest: "{{certificates_folder}}/{{item}}/ca.pem"
+    src: "{{cert_ca_dir_tmp}}/{{item}}/ca.pem"
+    dest: "{{k8s_cert_dir}}/{{item}}/ca.pem"
     owner: root
     group: root
     mode: 0644
@@ -26,8 +26,8 @@
 
 - name: Copy own certs
   copy:
-    src: "{{local_ca_folder}}/{{item}}"
-    dest: "{{certificates_folder}}/{{item}}"
+    src: "{{cert_ca_dir_tmp}}/{{item}}"
+    dest: "{{k8s_cert_dir}}/{{item}}"
     owner: root
     group: root
     mode: 0644
@@ -39,21 +39,6 @@
   tags:
   - certs
   - etcd
-
-- name: Check flannel etcd prefix exists
-  command: "{{etcdctl_cmd}} get {{flannel_etcd_prefix}}"
-  register: check_flannel_etcd_prefix
-  failed_when: '"Key not found" not in check_flannel_etcd_prefix.stderr'
-  run_once: yes
-  ignore_errors: yes
-  tags: flannel
-
-- name: Create flannel etcd prefix
-
-  command: "{{etcdctl_cmd}} mk {{flannel_etcd_prefix}}/config  \'{ \"Network\": \"{{flannel_node_network}}\", \"SubnetLen\": {{flannel_node_subnetlen}}, \"Backend\": {\"Type\": \"{{flannel_node_backend_type}}\"} }\'"
-  when: '"Key not found" in check_flannel_etcd_prefix.stderr'
-  run_once: yes
-  tags: flannel
 
 - name: Generate /etc/sysconfig/flanneld
   template: src=etc/sysconfig/flanneld.j2 dest=/etc/sysconfig/flanneld backup=yes
@@ -69,8 +54,15 @@
   template: src=etc/kubernetes/kubelet.j2 dest=/etc/kubernetes/kubelet
   tags: kubelet
 
-- name: Generate {{kubeconfig_path}}
-  template: src=kubeconfig.j2 dest={{kubeconfig_path}}
+- name: Generate kubelet kubeconfig
+  template: src=kubeconfig.j2 dest={{kubelet_kubeconfig}}
+  tags: kubelet
+
+- name: Fix docker log-driver option
+  lineinfile:
+    regexp: "^OPTIONS="
+    line: OPTIONS='--signature-verification=false'
+    dest: /etc/sysconfig/docker
   tags: kubelet
 
 - name: Start {{item}} service

@@ -1,7 +1,0 @@
-ca_wipe_all: no                         # wipe current folder
-ca_folder: ./certs                  # local folder used to create certificates
-ca_domain: cluster.local            # domain used for cluster
-
-ca_crt_expires: 3650                # expiration for root CA certificate
-ca_apiserver_crt_expires: 3650      # expiration for kube api server and kubelet certificates
-ca_etcd_crt_expires: 3650           # expiration for etcd certificates

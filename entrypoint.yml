@@ -1,25 +1,50 @@
 - hosts: k8s
   become: yes
 
-  vars:
-    domain: example.local
-    network:
-      int_iface: eth1
-      ext_iface: eth0
-      generate_hostfile: no
-      vx_lan_network: 172.30.0.0/16
-      vx_lan_subnet_len: 24
+  vars_files:
+  - vars/deploy.yml
 
-    dashboard: yes
+  pre_tasks:
+  - name: Create temporary tmp dir for CA
+    file:
+      path: "{{local_cert_ca_dir}}"
+      state: directory
+
+  - name: Check vagrant nat interface (workaround)
+    set_fact: k8s_net_iface=eth1
+    when: ansible_ssh_user == 'vagrant'
+    tags: always
 
   roles:
   - name: Prepare hosts with requirements
     role: k8s-common
+    tags: common
+
+  - name: Generate Etcd and Kubernetes certificates
+    role: k8s-certs
+    delegate_to: "{{groups['k8s-master'][0]}}"
+    run_once: yes
+    when: inventory_hostname in groups['k8s-master']
+    tags: certs
 
   - name: Prepare master nodes
     role: k8s-master
     when: inventory_hostname in groups['k8s-master']
+    tags: master
 
   - name: Prepare kubelet nodes
     role: k8s-node
+    tags: node
     when: inventory_hostname in groups['k8s-node']
+
+  - name: Deploy addons
+    role: k8s-addons
+    run_once: yes
+    when: inventory_hostname in groups['k8s-master']
+    tags: addons
+
+  post_tasks:
+  - name: Remove temporary tmp dir for CA
+    file:
+      path: "{{local_cert_ca_dir}}"
+      state: absent
