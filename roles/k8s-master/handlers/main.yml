@@ -6,6 +6,7 @@
 
 - name: restart etcd service
   service: name=etcd state=restarted
+  notify: check etcd cluster health
 
 - name: restart kube-apiserver service
   service: name=kube-apiserver state=restarted

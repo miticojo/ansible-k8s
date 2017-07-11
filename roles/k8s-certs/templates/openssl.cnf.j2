@@ -10,11 +10,11 @@ subjectAltName = @alt_names
 DNS.1 = kubernetes
 DNS.2 = kubernetes.default
 DNS.3 = kubernetes.default.svc
-DNS.4 = kubernetes.default.svc.{{cert_ca_domain}}
+DNS.4 = kubernetes.default.svc.{{dns_internal_domain}}
 {% for host in groups["k8s-master"] %}
 DNS.{{loop.index+4}} = {{host}}
 {% endfor %}
-IP.1 = 10.254.0.1
+IP.1 = {{kube_api_vip_address}}
 {% for host in groups["k8s-master"] %}
 IP.{{loop.index+1}} = {{hostvars[host].ansible_default_ipv4.address}}
 {% endfor %}

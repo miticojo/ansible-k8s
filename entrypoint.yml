@@ -7,7 +7,7 @@
   pre_tasks:
   - name: Create temporary tmp dir for CA
     file:
-      path: "{{local_cert_ca_dir}}"
+      path: "{{cert_ca_dir_tmp}}"
       state: directory
 
   - name: Check vagrant nat interface (workaround)
@@ -46,5 +46,5 @@
   post_tasks:
   - name: Remove temporary tmp dir for CA
     file:
-      path: "{{local_cert_ca_dir}}"
+      path: "{{cert_ca_dir_tmp}}"
       state: absent

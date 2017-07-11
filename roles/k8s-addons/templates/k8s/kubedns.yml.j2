@@ -55,7 +55,7 @@ spec:
           initialDelaySeconds: 3
           timeoutSeconds: 5
         args:
-        - --domain={{dns_domain}}.
+        - --domain={{dns_internal_domain}}.
         - --dns-port=10053
         env:
         - name: PROMETHEUS_PORT
@@ -132,9 +132,9 @@ spec:
             # net memory requested by the pod constant.
             memory: 50Mi
         args:
-        - --cmd=nslookup kubernetes.default.svc.{{dns_domain}} 127.0.0.1 >/dev/null
+        - --cmd=nslookup kubernetes.default.svc.{{dns_internal_domain}} 127.0.0.1 >/dev/null
         - --url=/healthz-dnsmasq
-        - --cmd=nslookup kubernetes.default.svc.{{dns_domain}} 127.0.0.1:10053 >/dev/null
+        - --cmd=nslookup kubernetes.default.svc.{{dns_internal_domain}} 127.0.0.1:10053 >/dev/null
         - --url=/healthz-kubedns
         - --port=8080
         - --quiet
@@ -155,7 +155,7 @@ metadata:
 spec:
   selector:
     k8s-app: kube-dns
-  clusterIP: {{dns_server}}
+  clusterIP: {{kube_dns_address}}
   ports:
   - name: dns
     port: 53

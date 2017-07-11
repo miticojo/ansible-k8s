@@ -1,6 +1,6 @@
 - name: Create addons manifest folder
   file:
-    path: "{{addons_manifest_dir}}"
+    path: "{{k8s_manifest_dir}}"
     owner: root
     group: root
     mode: 640
@@ -9,7 +9,7 @@
 - name: Copy manifests
   template:
     src: "templates/k8s/{{item}}.j2"
-    dest: "{{addons_manifest_dir}}/{{item}}"
+    dest: "{{k8s_manifest_dir}}/{{item}}"
   with_items:
   - kubedns.yml
   - dashboard.yml
@@ -18,7 +18,7 @@
   - cluster-monitoring.yml
 
 - name: Deploy addons
-  command: "kubectl apply -f {{addons_manifest_dir}}/{{item}}"
+  command: "kubectl apply -f {{k8s_manifest_dir}}/{{item}}"
   with_items:
   - kubedns.yml
   - dashboard.yml

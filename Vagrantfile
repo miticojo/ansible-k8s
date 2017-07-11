@@ -14,11 +14,11 @@ plugins.each do |plugin|
 end
 
 Vagrant.configure("2") do |config|
-  config.hostmanager.enabled = true
-  config.hostmanager.manage_host = true
-  config.hostmanager.manage_guest = true
-  config.hostmanager.ignore_private_ip = false
-  config.hostmanager.include_offline = true
+  # config.hostmanager.enabled = true
+  # config.hostmanager.manage_host = true
+  # config.hostmanager.manage_guest = true
+  # config.hostmanager.ignore_private_ip = false
+  # config.hostmanager.include_offline = true
   config.vm.synced_folder ".", "/vagrant", disabled: true
 
   (1..master_hosts).each do |i|
