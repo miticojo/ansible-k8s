@@ -8,7 +8,12 @@ https://{{hostvars[host]['ansible_'+ k8s_net_iface]['ipv4']['address']}}:2379
 
 # etcd config key.  This is the configuration key that flannel queries
 # For address range assignment
+FLANNEL_ETCD_KEY="{{flannel_etcd_key}}"
 FLANNEL_ETCD_PREFIX="{{flannel_etcd_prefix}}"
 
+FLANNELD_ETCD_CAFILE="{{etcd_certs_dir}}/ca.pem"
+FLANNELD_ETCD_CERTFILE="{{etcd_certs_dir}}/{{inventory_hostname}}.pem"
+FLANNELD_ETCD_KEYFILE="{{etcd_certs_dir}}/{{inventory_hostname}}-key.pem"
+
 # Any additional options that you want to pass
-FLANNEL_OPTIONS="-iface {{hostvars[inventory_hostname]['ansible_'+ k8s_net_iface]['ipv4']['address']}} -etcd-cafile={{etcd_certs_dir}}/ca.pem -etcd-certfile={{etcd_certs_dir}}/{{inventory_hostname}}.pem -etcd-keyfile={{etcd_certs_dir}}/{{inventory_hostname}}-key.pem"
+FLANNEL_OPTIONS="-iface {{hostvars[inventory_hostname]['ansible_'+ k8s_net_iface]['ipv4']['address']}}"

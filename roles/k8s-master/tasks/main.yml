@@ -3,7 +3,6 @@
   with_items:
   - kubernetes
   - etcd
-  - flannel
 
 - name: Copy CA folder from first master SERVER
   command: "rsync -arvce 'ssh -o StrictHostKeyChecking=no' \
@@ -146,16 +145,6 @@
   command: "{{etcdctl_cmd}} mk {{flannel_etcd_prefix}}/config  \'{ \"Network\": \"{{flannel_node_network}}\", \"SubnetLen\": {{flannel_node_subnetlen}}, \"Backend\": {\"Type\": \"{{flannel_node_backend_type}}\"} }\'"
   when: '"Key not found" in check_flannel_etcd_prefix.stderr'
   run_once: yes
-  tags: flannel
-
-- name: Generate /etc/sysconfig/flanneld
-  template: src=etc/sysconfig/flanneld.j2 dest=/etc/sysconfig/flanneld backup=yes
-  tags: flannel
-  notify:
-  - restart flanneld service
-
-- name: Start and enable flanneld
-  service: name=flanneld state=restarted enabled=yes
   tags: flannel
 
 - name: Force all notified handlers to run at this point, not waiting for normal sync points
