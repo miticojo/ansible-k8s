@@ -16,6 +16,7 @@
   - registry.yml
   - centralized-logging.yml
   - cluster-monitoring.yml
+  - traefik.yml
 
 - name: Deploy addons
   command: "kubectl apply -f {{k8s_manifest_dir}}/{{item}}"

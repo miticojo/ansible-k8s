@@ -58,6 +58,7 @@ kube_api_admission_control:
 - ServiceAccount
 - ResourceQuota
 kube_api_args:
+- "--allow-privileged"
 - "--token-auth-file={{k8s_token_dir}}/known_tokens.csv"
 - "--etcd-cafile {{etcd_certs_dir}}/ca.pem"
 - "--etcd-certfile {{etcd_certs_dir}}/{{inventory_hostname}}.pem"
